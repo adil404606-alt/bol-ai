@@ -1,0 +1,116 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f5fff8">
+<title>Bol — English to Hinglish</title>
+<style>
+:root{font-family:system-ui,sans-serif;color:#163326;background:#f5fff8}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px;min-height:100vh}
+main{max-width:620px;margin:30px auto}
+.brand{font-size:34px;font-weight:800;color:#16834e}
+.sub{color:#5d7568;margin:5px 0 26px}
+.panel{background:white;border:1px solid #dceee2;border-radius:22px;padding:20px}
+label{font-weight:700;display:block;margin-bottom:10px}
+textarea{width:100%;min-height:145px;border:1px solid #d7e7dc;border-radius:14px;padding:14px;font:inherit;resize:vertical}
+.meta{display:flex;justify-content:space-between;color:#718579;font-size:12px;margin:7px 2px 16px}
+button{border:0;border-radius:13px;padding:13px 17px;font:inherit;font-weight:700;cursor:pointer}
+.primary{background:#16834e;color:white;width:100%}
+.secondary{background:#eaf7ef;color:#17643d}
+button:disabled{opacity:.55}
+.examples{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}
+.examples button{font-size:12px;padding:8px 11px}
+.result{margin-top:18px;background:#f2fbf5;border-radius:14px;padding:15px;min-height:70px;white-space:pre-wrap;line-height:1.55;overflow-wrap:anywhere}
+.actions{display:flex;gap:8px;margin-top:10px}
+.actions button{flex:1}
+.error{color:#b42318;font-size:13px;margin-top:10px}
+footer{text-align:center;color:#819187;font-size:12px;margin:20px}
+</style>
+</head>
+<body>
+<main>
+<div class="brand">bol.</div>
+<div class="sub">English to natural Hinglish — simple, clear, everyday.</div>
+<section class="panel">
+<label for="source">Enter English text</label>
+<textarea id="source" maxlength="500" placeholder="Type something in English..."></textarea>
+<div class="meta"><span>Translate up to 500 characters</span><span id="count">0/500</span></div>
+<button class="primary" id="translate">Translate to Hinglish</button>
+<div class="examples">
+<button class="secondary" data-example="How are you doing today?">How are you?</button>
+<button class="secondary" data-example="I will call you later.">Call you later</button>
+<button class="secondary" data-example="Please wait for me.">Wait for me</button>
+</div>
+<div id="error" class="error" role="alert"></div>
+<div class="result" id="result">Your Hinglish translation will appear here.</div>
+<div class="actions">
+<button class="secondary" id="copy">Copy result</button>
+<button class="secondary" id="clear">Clear</button>
+</div>
+</section>
+<footer>Bol • AI-powered translation</footer>
+</main>
+<script>
+const source=document.getElementById('source');
+const count=document.getElementById('count');
+const result=document.getElementById('result');
+const error=document.getElementById('error');
+const translateBtn=document.getElementById('translate');
+
+source.addEventListener('input',()=>count.textContent=source.value.length+'/500');
+
+document.querySelectorAll('[data-example]').forEach(b=>{
+ b.addEventListener('click',()=>{
+  source.value=b.dataset.example;
+  source.dispatchEvent(new Event('input'));
+ });
+});
+
+translateBtn.addEventListener('click',async()=>{
+ error.textContent='';
+ const text=source.value.trim();
+ if(!text){error.textContent='Please enter some English text.';return;}
+ translateBtn.disabled=true;
+ translateBtn.textContent='Translating…';
+ result.textContent='Please wait…';
+ try{
+  const r=await fetch('/api/translate',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({text})
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.error||'Translation failed.');
+  result.textContent=data.translation;
+ }catch(e){
+  result.textContent='Your translation will appear here.';
+  error.textContent=e.message||'Something went wrong.';
+ }finally{
+  translateBtn.disabled=false;
+  translateBtn.textContent='Translate to Hinglish';
+ }
+});
+
+document.getElementById('copy').addEventListener('click',async()=>{
+ const t=result.textContent;
+ if(!t||t.startsWith('Your Hinglish'))return;
+ try{
+  await navigator.clipboard.writeText(t);
+  error.textContent='Copied!';
+ }catch{
+  error.textContent='Copy is not available in this browser.';
+ }
+});
+
+document.getElementById('clear').addEventListener('click',()=>{
+ source.value='';
+ source.dispatchEvent(new Event('input'));
+ result.textContent='Your Hinglish translation will appear here.';
+ error.textContent='';
+});
+</script>
+</body>
+</html>
