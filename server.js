@@ -7,17 +7,47 @@ app.use(express.json({ limit: "10kb" }));
 app.use(express.static("public"));
 
 const PORT = process.env.PORT || 3000;
+
 const groq = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY })
   : null;
 
 app.post("/api/translate", async (req, res) => {
   try {
-    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    const text = typeof req.body?.text === "string"
+      ? req.body.text.trim()
+      : "";
 
-    if (!text) return res.status(400).json({ error: "Please enter some text." });
-    if (text.length > 500) return res.status(400).json({ error: "Please keep your text under 500 characters." });
-    if (!groq) return res.status(503).json({ error: "Translation service is not configured." });
+    const recipient = ["myself", "someone"].includes(req.body?.recipient)
+      ? req.body.recipient
+      : "someone";
+
+    const gender = ["male", "female", "neutral"].includes(req.body?.gender)
+      ? req.body.gender
+      : "neutral";
+
+    if (!text) {
+      return res.status(400).json({ error: "Please enter some text." });
+    }
+
+    if (text.length > 500) {
+      return res.status(400).json({ error: "Please keep your text under 500 characters." });
+    }
+
+    if (!groq) {
+      return res.status(503).json({ error: "Translation service is not configured." });
+    }
+
+    const recipientDescription =
+      recipient === "myself"
+        ? "The selected person is the user themselves."
+        : "The selected person is someone receiving the message.";
+
+    const genderDescription = {
+      male: "The selected person's gender is male. Use masculine Hindi grammatical forms when referring to this person.",
+      female: "The selected person's gender is female. Use feminine Hindi grammatical forms when referring to this person.",
+      neutral: "Use natural gender-neutral wording wherever possible. Avoid unnecessary gender assumptions."
+    }[gender];
 
     const completion = await groq.chat.completions.create({
       model: process.env.GROQ_MODEL || "openai/gpt-oss-20b",
@@ -26,45 +56,49 @@ app.post("/api/translate", async (req, res) => {
       messages: [
         {
           role: "system",
-          content: `You are Bol, a highly skilled English-to-Hinglish translator.
+          content: `You are Bol, an expert English-to-natural-Hinglish translator.
 
-YOUR JOB:
-Translate English into natural, fluent, everyday Indian Hinglish.
+Translate English into fluent, everyday Indian Hinglish written in Roman letters.
+
+RECIPIENT SETTINGS:
+${recipientDescription}
+${genderDescription}
 
 IMPORTANT RULES:
-1. Understand the meaning and context, never translate word by word.
-2. Write Hinglish using Roman letters, not Devanagari script.
-3. Use natural Indian conversational expressions.
-4. Preserve the original meaning, emotion, tone and intention.
-5. Use correct Hindi grammar and sentence structure.
-6. Handle phrases, idioms, slang and romantic expressions naturally.
-7. Never produce awkward literal translations.
-8. Do not add information that is not in the original sentence.
-9. Preserve names, numbers and emojis.
-10. If the speaker's gender is unknown, prefer natural gender-neutral wording wherever possible. Do not guess gender unnecessarily.
-11. Keep questions as questions and statements as statements.
-12. Return ONLY the translated Hinglish sentence. Never explain your translation.
+1. Understand meaning and context. Never translate word by word.
+2. Use natural Indian conversational Hindi-English.
+3. Apply the selected gender to grammatical references to the selected person.
+4. Do not assume the sender's gender from the recipient's gender.
+5. If the sentence refers to the sender, do not change the sender's gender based on the recipient setting.
+6. Preserve the original meaning, emotion, tone, names, numbers and emojis.
+7. Use natural expressions and correct Hindi grammar.
+8. Avoid awkward literal translations.
+9. Use Roman letters, not Devanagari.
+10. Return ONLY the translated text. Do not explain.
 
 EXAMPLES:
+
+English: What are you doing?
+Male: Tum kya kar rahe ho?
+Female: Tum kya kar rahi ho?
+Neutral: Tum kya kar rahe/rahi ho?
 
 English: I miss you, but I don't know how to tell you.
 Hinglish: Mujhe tumhari yaad aa rahi hai, lekin mujhe nahi pata ki tumhe kaise bataun.
 
-English: What are you doing?
-Hinglish: Tum kya kar rahe ho?
-
-English: I am feeling very tired today.
-Hinglish: Aaj main bahut thaka hua mehsoos kar raha hoon.
+English: Are you coming tomorrow?
+Male: Kya tum kal aa rahe ho?
+Female: Kya tum kal aa rahi ho?
 
 English: I love you so much.
-Hinglish: Main tumse bahut pyaar karta hoon.
+Hinglish: Main tumse bahut pyaar karta/karti hoon.
 
-English: Don't worry, everything will be fine.
-Hinglish: Pareshan mat ho, sab theek ho jayega.
-
-Now translate the user's text naturally.`
+Translate the user's text naturally using the selected recipient settings.`
         },
-        { role: "user", content: text }
+        {
+          role: "user",
+          content: text
+        }
       ]
     });
 
@@ -75,6 +109,7 @@ Now translate the user's text naturally.`
     }
 
     res.json({ translation });
+
   } catch (error) {
     console.error("Translation error:", error?.message || error);
     res.status(500).json({ error: "Translation failed. Please try again." });
@@ -83,4 +118,6 @@ Now translate the user's text naturally.`
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-app.listen(PORT, () => console.log(`Bol is running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Bol is running on port ${PORT}`);
+});
