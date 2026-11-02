@@ -28,31 +28,66 @@ button:disabled{opacity:.55}
 .actions button{flex:1}
 .error{color:#b42318;font-size:13px;margin-top:10px}
 footer{text-align:center;color:#819187;font-size:12px;margin:20px}
+.choice-section{margin:20px 0}
+.choice-title{font-weight:700;margin-bottom:10px}
+.choices{display:flex;gap:9px;flex-wrap:wrap}
+.choice{background:#f2f7f3;color:#315b43;border:1px solid #dceee2;padding:10px 15px}
+.choice.active{background:#16834e;color:white;border-color:#16834e}
+.hint{font-size:12px;color:#718579;margin-top:7px}
 </style>
 </head>
 <body>
 <main>
 <div class="brand">bol.</div>
 <div class="sub">English to natural Hinglish — simple, clear, everyday.</div>
+
 <section class="panel">
+
 <label for="source">Enter English text</label>
 <textarea id="source" maxlength="500" placeholder="Type something in English..."></textarea>
-<div class="meta"><span>Translate up to 500 characters</span><span id="count">0/500</span></div>
+<div class="meta">
+<span>Translate up to 500 characters</span>
+<span id="count">0/500</span>
+</div>
+
+<div class="choice-section">
+<div class="choice-title">Who are you sending this message to?</div>
+<div class="choices" id="recipientChoices">
+<button type="button" class="choice active" data-recipient="myself">Myself</button>
+<button type="button" class="choice" data-recipient="someone">Someone else</button>
+</div>
+</div>
+
+<div class="choice-section">
+<div class="choice-title">Select recipient's gender</div>
+<div class="choices" id="genderChoices">
+<button type="button" class="choice" data-gender="male">Male</button>
+<button type="button" class="choice active" data-gender="female">Female</button>
+<button type="button" class="choice" data-gender="neutral">Neutral</button>
+</div>
+<div class="hint">Bol will use this to choose suitable Hindi grammar.</div>
+</div>
+
 <button class="primary" id="translate">Translate to Hinglish</button>
+
 <div class="examples">
 <button class="secondary" data-example="How are you doing today?">How are you?</button>
 <button class="secondary" data-example="I will call you later.">Call you later</button>
 <button class="secondary" data-example="Please wait for me.">Wait for me</button>
 </div>
+
 <div id="error" class="error" role="alert"></div>
 <div class="result" id="result">Your Hinglish translation will appear here.</div>
+
 <div class="actions">
 <button class="secondary" id="copy">Copy result</button>
 <button class="secondary" id="clear">Clear</button>
 </div>
+
 </section>
 <footer>Bol • AI-powered translation</footer>
 </main>
+
 <script>
 const source=document.getElementById('source');
 const count=document.getElementById('count');
@@ -60,11 +95,36 @@ const result=document.getElementById('result');
 const error=document.getElementById('error');
 const translateBtn=document.getElementById('translate');
 
-source.addEventListener('input',()=>count.textContent=source.value.length+'/500');
+let recipient='myself';
+let gender='female';
 
-document.querySelectorAll('[data-example]').forEach(b=>{
- b.addEventListener('click',()=>{
-  source.value=b.dataset.example;
+function selectChoice(container,attribute,value){
+ document.querySelectorAll('#'+container+' button').forEach(button=>{
+  button.classList.toggle('active',button.dataset[attribute]===value);
+ });
+}
+
+document.querySelectorAll('[data-recipient]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  recipient=button.dataset.recipient;
+  selectChoice('recipientChoices','recipient',recipient);
+ });
+});
+
+document.querySelectorAll('[data-gender]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  gender=button.dataset.gender;
+  selectChoice('genderChoices','gender',gender);
+ });
+});
+
+source.addEventListener('input',()=>{
+ count.textContent=source.value.length+'/500';
+});
+
+document.querySelectorAll('[data-example]').forEach(button=>{
+ button.addEventListener('click',()=>{
+  source.value=button.dataset.example;
   source.dispatchEvent(new Event('input'));
  });
 });
@@ -72,19 +132,31 @@ document.querySelectorAll('[data-example]').forEach(b=>{
 translateBtn.addEventListener('click',async()=>{
  error.textContent='';
  const text=source.value.trim();
- if(!text){error.textContent='Please enter some English text.';return;}
+
+ if(!text){
+  error.textContent='Please enter some English text.';
+  return;
+ }
+
  translateBtn.disabled=true;
  translateBtn.textContent='Translating…';
  result.textContent='Please wait…';
+
  try{
   const r=await fetch('/api/translate',{
    method:'POST',
    headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({text})
+   body:JSON.stringify({
+    text,
+    recipient,
+    gender
+   })
   });
+
   const data=await r.json();
   if(!r.ok)throw new Error(data.error||'Translation failed.');
   result.textContent=data.translation;
+
  }catch(e){
   result.textContent='Your translation will appear here.';
   error.textContent=e.message||'Something went wrong.';
@@ -97,6 +169,7 @@ translateBtn.addEventListener('click',async()=>{
 document.getElementById('copy').addEventListener('click',async()=>{
  const t=result.textContent;
  if(!t||t.startsWith('Your Hinglish'))return;
+
  try{
   await navigator.clipboard.writeText(t);
   error.textContent='Copied!';
