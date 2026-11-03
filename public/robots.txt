@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://bol-ai-c9to.onrender.com/sitemap.xml
